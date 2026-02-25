@@ -1,1 +1,1 @@
-# crypto_price_jp
+# cry
