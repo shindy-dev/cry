@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FLR Dashboard & Tax Calc</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #4F46E5;
+            --primary-hover: #4338CA;
+            --bg: #F3F4F6;
+            --card: #FFFFFF;
+            --text: #1F2937;
+            --border: #E5E7EB;
+            --accent: #F59E0B;
+        }
+
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        header {
+            background-color: var(--card);
+            width: 100%;
+            padding: 16px 0;
+            text-align: center;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            margin-bottom: 24px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--primary);
+            letter-spacing: 1px;
+        }
+
+        .container {
+            width: 95%;
+            max-width: 1000px;
+            margin-bottom: 60px;
+        }
+
+        .card {
+            background-color: var(--card);
+            border-radius: 16px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        /* 設定エリア */
+        .setup-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        @media (min-width: 600px) {
+            .setup-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        .input-group label {
+            display: block;
+            font-size: 0.9rem;
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #4B5563;
+        }
+
+        .input-group input[type="number"],
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 1rem;
+            box-sizing: border-box;
+        }
+
+        .upload-area {
+            position: relative;
+            text-align: center;
+            height: 100%;
+        }
+
+        .upload-label {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            height: 100%;
+            border: 2px dashed #A5B4FC;
+            background-color: #EEF2FF;
+            color: var(--primary);
+            padding: 20px;
+            border-radius: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-sizing: border-box;
+        }
+
+        .upload-label:hover {
+            background-color: #E0E7FF;
+            border-color: var(--primary);
+        }
+
+        .upload-area input[type=file] {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .status {
+            text-align: center;
+            font-size: 0.95rem;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+
+        .status.loading {
+            color: #D97706;
+        }
+
+        .status.success {
+            color: #059669;
+        }
+
+        .status.error {
+            color: #DC2626;
+        }
+
+        /* サマリーカード */
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+            display: none;
+        }
+
+        @media (min-width: 768px) {
+            .summary-grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+
+        .summary-box {
+            background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+        }
+
+        .summary-box.highlight {
+            background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
+            color: white;
+            border: none;
+        }
+
+        .summary-title {
+            font-size: 0.85rem;
+            color: #6B7280;
+            margin-bottom: 4px;
+            font-weight: bold;
+        }
+
+        .summary-box.highlight .summary-title {
+            color: #E0E7FF;
+        }
+
+        .summary-value {
+            font-size: 1.5rem;
+            font-weight: 900;
+            margin: 0;
+        }
+
+        /* タブUI */
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid var(--border);
+            margin-bottom: 20px;
+            overflow-x: auto;
+            white-space: nowrap;
+        }
+
+        .tab-btn {
+            flex: 1;
+            background: none;
+            border: none;
+            padding: 14px 20px;
+            font-size: 1rem;
+            font-weight: bold;
+            color: #6B7280;
+            cursor: pointer;
+            transition: 0.2s;
+            border-bottom: 3px solid transparent;
+            outline: none;
+        }
+
+        .tab-btn:hover {
+            color: var(--primary);
+            background-color: #F9FAFB;
+        }
+
+        .tab-btn.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.4s ease;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(5px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* グラフ・テーブルエリア */
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
+            margin-bottom: 24px;
+        }
+
+        .section-title {
+            font-size: 1.1rem;
+            font-weight: bold;
+            border-left: 4px solid var(--primary);
+            padding-left: 8px;
+            margin-bottom: 16px;
+        }
+
+        .table-container {
+            overflow-x: auto;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            margin-bottom: 24px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: right;
+            font-size: 0.85rem;
+            white-space: nowrap;
+        }
+
+        th,
+        td {
+            padding: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            background-color: #F9FAFB;
+            font-weight: 600;
+            color: #4B5563;
+        }
+
+        th:first-child,
+        td:first-child {
+            text-align: left;
+        }
+
+        tr:hover {
+            background-color: #F3F4F6;
+        }
+
+        .monthly-table th {
+            background-color: #EEF2FF;
+            color: var(--primary);
+        }
+
+        /* フィルターUI */
+        .filter-area {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+            background: #F9FAFB;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        .filter-area select {
+            width: auto;
+            min-width: 200px;
+            padding: 8px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <h1>FLR Dashboard & Tax Calc</h1>
+    </header>
+
+    <div class="container">
+        <div class="card">
+            <div class="setup-grid">
+                <div class="input-group">
+                    <label>デリゲートしている元本枚数 (任意)</label>
+                    <input type="number" id="principalInput" placeholder="例: 100000" />
+                    <small
+                        style="color:#6B7280; font-size: 0.75rem; margin-top:4px; display:block;">※入力すると推定年利(APR)が計算されます</small>
+                </div>
+                <div class="upload-area">
+                    <div class="upload-label">
+                        📁 タップしてCSVを選択<br>
+                        <span style="font-size: 0.75rem; font-weight: normal; margin-top: 4px;">(日付, FLR数量 のデータ)</span>
+                    </div>
+                    <input type="file" id="csvFileInput" accept=".csv" />
+                </div>
+            </div>
+            <div id="status" class="status">CSVファイルを選択してください</div>
+        </div>
+
+        <div id="summaryGrid" class="summary-grid">
+            <div class="summary-box highlight">
+                <div class="summary-title">年間の合計利益</div>
+                <div class="summary-value">¥<span id="sumJpy">0</span></div>
+            </div>
+            <div class="summary-box">
+                <div class="summary-title">獲得FLR総量</div>
+                <div class="summary-value"><span id="sumFlr">0</span> <span style="font-size:0.9rem">FLR</span></div>
+            </div>
+            <div class="summary-box">
+                <div class="summary-title">平均取得単価</div>
+                <div class="summary-value">¥<span id="avgPrice">0.00</span></div>
+            </div>
+            <div class="summary-box">
+                <div class="summary-title">平均年利 (APR)</div>
+                <div class="summary-value"><span id="avgApr">-</span> <span style="font-size:0.9rem">%</span></div>
+            </div>
+        </div>
+
+        <div id="dashboardArea" class="card" style="display: none; padding: 0; overflow: hidden;">
+
+            <div class="tabs">
+                <button class="tab-btn active" onclick="switchTab('charts')">📊 グラフ</button>
+                <button class="tab-btn" onclick="switchTab('monthly')">📅 月間レポート</button>
+                <button class="tab-btn" onclick="switchTab('history')">📝 全履歴</button>
+            </div>
+
+            <div style="padding: 0 24px 24px 24px;">
+
+                <div id="tab-charts" class="tab-content active">
+                    <div class="section-title">FLR価格推移 ＆ 報酬獲得量</div>
+                    <div class="chart-container">
+                        <canvas id="priceChart"></canvas>
+                    </div>
+                    <div class="section-title" style="margin-top: 32px;">累計利益の推移 (日本円)</div>
+                    <div class="chart-container">
+                        <canvas id="cumulativeChart"></canvas>
+                    </div>
+                </div>
+
+                <div id="tab-monthly" class="tab-content">
+                    <div class="filter-area">
+                        <label for="monthFilter" style="font-weight: bold; color: #4B5563;">表示する年月：</label>
+                        <select id="monthFilter" onchange="renderMonthlyReport()"></select>
+                    </div>
+
+                    <div class="section-title" id="monthlyReportTitle">月間サマリー</div>
+                    <div class="table-container">
+                        <table class="monthly-table" id="monthlyTable"></table>
+                    </div>
+
+                    <div id="monthlyDetailSection" style="display: none; margin-top: 24px;">
+                        <div class="section-title" style="border-left-color: #10B981;">当該月の日別データ</div>
+                        <div class="table-container">
+                            <table id="monthlyDetailTable"></table>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="tab-history" class="tab-content">
+                    <div class="section-title">全履歴データ</div>
+                    <div class="table-container">
+                        <table id="historyTable"></table>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let priceChartInstance = null;
+        let cumulativeChartInstance = null;
+
+        // グローバルデータ保持用
+        let globalMonthlyData = {};
+        let globalHistoryRows = [];
+
+        // タブ切り替え関数
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById(`tab-${tabId}`).classList.add('active');
+            document.querySelector(`.tab-btn[onclick="switchTab('${tabId}')"]`).classList.add('active');
+        }
+
+        document.getElementById('csvFileInput').addEventListener('change', async function (e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const statusEl = document.getElementById('status');
+            statusEl.className = 'status loading';
+            statusEl.innerText = 'データを解析・取得中...';
+
+            document.getElementById('summaryGrid').style.display = 'none';
+            document.getElementById('dashboardArea').style.display = 'none';
+
+            const reader = new FileReader();
+            reader.onload = async function (e) {
+                await processData(e.target.result, statusEl);
+            };
+            reader.readAsText(file);
+        });
+
+        async function processData(csvText, statusEl) {
+            const lines = csvText.split('\n');
+            const yearsToFetch = new Set();
+            const parsedRows = [];
+            const principal = parseFloat(document.getElementById('principalInput').value) || null;
+
+            for (let i = 1; i < lines.length; i++) {
+                if (lines[i].trim() === '') continue;
+                const cells = lines[i].split(',');
+                const dateStr = cells[0].trim();
+                const amount = parseFloat(cells[1]);
+
+                if (dateStr.length >= 4 && !isNaN(amount)) {
+                    const year = dateStr.substring(0, 4);
+                    if (parseInt(year) >= 2020) yearsToFetch.add(year);
+                    parsedRows.push({ dateStr, amount });
+                }
+            }
+
+            const priceMap = {};
+            for (const year of yearsToFetch) {
+                try {
+                    const url = `https://public.bitbank.cc/flr_jpy/candlestick/1day/${year}`;
+                    const response = await fetch(url);
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                    const json = await response.json();
+                    if (json.success === 1) {
+                        for (const candle of json.data.candlestick[0].ohlcv) {
+                            const d = new Date(parseInt(candle[5]));
+                            const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                            priceMap[dateKey] = parseFloat(candle[3]);
+                        }
+                    }
+                } catch (error) {
+                    statusEl.className = 'status error';
+                    statusEl.innerText = `APIエラー: ${year}年のデータが取得できませんでした。`;
+                    return;
+                }
+            }
+
+            let totalJpy = 0, totalFlr = 0;
+            const chartDates = [], chartPrices = [], chartFlr = [], chartCumulative = [];
+            let currentCumulativeJpy = 0;
+
+            globalMonthlyData = {};
+            globalHistoryRows = [];
+            let historyHtml = '<tr><th>日付</th><th>獲得FLR</th><th>FLR価格(終値)</th><th>利益(円)</th><th>推定年利(日次)</th></tr>';
+
+            let prevDate = null;
+            for (let i = 0; i < parsedRows.length; i++) {
+                const row = parsedRows[i];
+                const price = priceMap[row.dateStr] || 0;
+                const profit = row.amount * price;
+
+                totalFlr += row.amount;
+                totalJpy += profit;
+                currentCumulativeJpy += profit;
+
+                chartDates.push(row.dateStr);
+                chartPrices.push(price);
+                chartFlr.push(row.amount);
+                chartCumulative.push(currentCumulativeJpy);
+
+                const monthKey = row.dateStr.substring(0, 7);
+                if (!globalMonthlyData[monthKey]) globalMonthlyData[monthKey] = { flr: 0, jpy: 0 };
+                globalMonthlyData[monthKey].flr += row.amount;
+                globalMonthlyData[monthKey].jpy += profit;
+
+                let dailyAprStr = '-';
+                if (principal && principal > 0 && price > 0) {
+                    let daysDiff = 3.5;
+                    if (prevDate) {
+                        const diffTime = Math.abs(new Date(row.dateStr) - new Date(prevDate));
+                        daysDiff = diffTime / (1000 * 60 * 60 * 24);
+                        if (daysDiff === 0) daysDiff = 3.5;
+                    }
+                    const apr = (row.amount / principal) * (365 / daysDiff) * 100;
+                    dailyAprStr = apr.toFixed(2) + '%';
+                }
+                prevDate = row.dateStr;
+
+                const rowData = { dateStr: row.dateStr, amount: row.amount, price: price, profit: profit, aprStr: dailyAprStr, monthKey: monthKey };
+                globalHistoryRows.push(rowData);
+
+                historyHtml += `<tr>
+                    <td style="text-align:left">${rowData.dateStr}</td>
+                    <td>${rowData.amount.toFixed(2)}</td>
+                    <td>¥${price > 0 ? price.toFixed(3) : '-'}</td>
+                    <td style="font-weight:bold; color:var(--primary)">¥${Math.round(profit).toLocaleString()}</td>
+                    <td>${dailyAprStr}</td>
+                </tr>`;
+            }
+
+            document.getElementById('sumJpy').innerText = Math.round(totalJpy).toLocaleString();
+            document.getElementById('sumFlr').innerText = totalFlr.toLocaleString(undefined, { maximumFractionDigits: 2 });
+            document.getElementById('avgPrice').innerText = (totalFlr > 0 ? (totalJpy / totalFlr).toFixed(2) : '0.00');
+
+            if (principal && chartDates.length > 1) {
+                const startD = new Date(chartDates[0]);
+                const endD = new Date(chartDates[chartDates.length - 1]);
+                const totalDays = Math.max((endD - startD) / (1000 * 60 * 60 * 24), 3.5);
+                const avgApr = (totalFlr / principal) * (365 / totalDays) * 100;
+                document.getElementById('avgApr').innerText = avgApr.toFixed(2);
+            } else {
+                document.getElementById('avgApr').innerText = '-';
+            }
+
+            document.getElementById('historyTable').innerHTML = historyHtml;
+
+            // 月間レポートのドロップダウン生成
+            const filterSelect = document.getElementById('monthFilter');
+            filterSelect.innerHTML = '<option value="all">すべての期間</option>';
+            Object.keys(globalMonthlyData).sort().forEach(m => {
+                const displayMonth = m.replace('-', '年') + '月';
+                filterSelect.innerHTML += `<option value="${m}">${displayMonth}</option>`;
+            });
+
+            // 月間レポートの初期描画
+            renderMonthlyReport();
+
+            renderCharts(chartDates, chartPrices, chartFlr, chartCumulative);
+
+            document.getElementById('summaryGrid').style.display = 'grid';
+            document.getElementById('dashboardArea').style.display = 'block';
+            switchTab('charts'); // 初期タブはグラフに
+            statusEl.className = 'status success';
+            statusEl.innerText = '✅ 解析・グラフ化が完了しました！';
+        }
+
+        // 月間レポートの描画関数
+        function renderMonthlyReport() {
+            const selectedMonth = document.getElementById('monthFilter').value;
+            const table = document.getElementById('monthlyTable');
+            const detailSection = document.getElementById('monthlyDetailSection');
+            const detailTable = document.getElementById('monthlyDetailTable');
+
+            let html = '<tr><th>年月</th><th>月間獲得FLR</th><th>月間利益(円)</th></tr>';
+
+            if (selectedMonth === 'all') {
+                document.getElementById('monthlyReportTitle').innerText = 'すべての月間サマリー';
+                detailSection.style.display = 'none'; // 詳細テーブルは隠す
+
+                for (const [month, data] of Object.entries(globalMonthlyData)) {
+                    html += `<tr>
+                        <td style="text-align:left; font-weight:bold;">${month}</td>
+                        <td>${data.flr.toFixed(2)}</td>
+                        <td style="font-weight:bold; color:var(--primary)">¥${Math.round(data.jpy).toLocaleString()}</td>
+                    </tr>`;
+                }
+            } else {
+                // 特定月が選ばれた場合
+                const displayMonth = selectedMonth.replace('-', '年') + '月';
+                document.getElementById('monthlyReportTitle').innerText = `${displayMonth} のサマリー`;
+                const data = globalMonthlyData[selectedMonth];
+
+                html += `<tr>
+                    <td style="text-align:left; font-weight:bold;">${selectedMonth}</td>
+                    <td>${data.flr.toFixed(2)}</td>
+                    <td style="font-weight:bold; color:var(--primary)">¥${Math.round(data.jpy).toLocaleString()}</td>
+                </tr>`;
+
+                // その月の日別詳細テーブルを生成して表示
+                let detailHtml = '<tr><th>日付</th><th>獲得FLR</th><th>FLR価格(終値)</th><th>利益(円)</th></tr>';
+                const targetRows = globalHistoryRows.filter(row => row.monthKey === selectedMonth);
+
+                targetRows.forEach(row => {
+                    detailHtml += `<tr>
+                        <td style="text-align:left">${row.dateStr}</td>
+                        <td>${row.amount.toFixed(2)}</td>
+                        <td>¥${row.price > 0 ? row.price.toFixed(3) : '-'}</td>
+                        <td style="font-weight:bold; color:var(--primary)">¥${Math.round(row.profit).toLocaleString()}</td>
+                    </tr>`;
+                });
+                detailTable.innerHTML = detailHtml;
+                detailSection.style.display = 'block';
+            }
+
+            table.innerHTML = html;
+        }
+
+        function renderCharts(dates, prices, flrAmounts, cumulatives) {
+            if (priceChartInstance) priceChartInstance.destroy();
+            if (cumulativeChartInstance) cumulativeChartInstance.destroy();
+
+            const ctx1 = document.getElementById('priceChart').getContext('2d');
+            priceChartInstance = new Chart(ctx1, {
+                type: 'bar',
+                data: {
+                    labels: dates,
+                    datasets: [
+                        { label: 'FLR価格(円)', data: prices, type: 'line', borderColor: '#F59E0B', backgroundColor: 'rgba(245, 158, 11, 0.1)', borderWidth: 2, tension: 0.3, yAxisID: 'y1', pointRadius: 2 },
+                        { label: '獲得FLR', data: flrAmounts, backgroundColor: 'rgba(79, 70, 229, 0.6)', borderRadius: 4, yAxisID: 'y2' }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, scales: { x: { grid: { display: false } }, y1: { type: 'linear', position: 'left', title: { display: true, text: '価格 (円)' } }, y2: { type: 'linear', position: 'right', grid: { display: false }, title: { display: true, text: '獲得FLR' } } } }
+            });
+
+            const ctx2 = document.getElementById('cumulativeChart').getContext('2d');
+            cumulativeChartInstance = new Chart(ctx2, {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: [{ label: '累計利益(円)', data: cumulatives, borderColor: '#10B981', backgroundColor: 'rgba(16, 185, 129, 0.2)', borderWidth: 3, fill: true, tension: 0.4, pointRadius: 0, pointHitRadius: 10 }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, scales: { x: { grid: { display: false } }, y: { title: { display: true, text: '累計利益 (円)' } } } }
+            });
+        }
+    </script>
+</body>
+
+</html>
